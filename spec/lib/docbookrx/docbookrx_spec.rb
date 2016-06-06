@@ -1,7 +1,12 @@
 # coding: utf-8
+# vim: set ft=ruby sts=2 ts=2 sw=2 expandtab fo-=t:
 require 'spec_helper'
 
 describe 'Conversion' do
+
+=begin
+=end
+
   it 'should create a document header with title, author and attributes' do
     input = <<-EOS
 <?xml version="1.0" encoding="UTF-8"?>
@@ -299,6 +304,7 @@ void qsort (void *dataptr[],
     EOS
 
     expected = <<-EOS.rstrip
+
 [NOTE]
 ====
 Please note the fruit: 
@@ -310,7 +316,7 @@ Apple, oranges and bananas
 
     output = Docbookrx.convert input
 
-    expect(output).to include(expected)
+    expect(output).to eq(expected)
   end
 
   it 'should accept special section names without title' do
@@ -504,6 +510,7 @@ Working Draft, 26 March 2003. OASIS. http://relaxng.org/compact-tutorial-2003032
     EOS
 
     expected = <<-EOS.rstrip
+
 Some examples: 
 
 * get all process definitions
@@ -534,7 +541,7 @@ But a newline at the end
    EOS
     output = Docbookrx.convert input
 
-    expect(output).to include(expected)
+    expect(output).to eq(expected)
   end
 
   it 'should convert emphasis bold elements correctly' do
@@ -1109,6 +1116,345 @@ EOS
     output = Docbookrx.convert input
 
     expect(output).to include(expected)
+  end
+
+  it 'should handle direct title and subtitle' do
+    input = <<-EOS
+<?xml version="1.0" encoding="UTF-8"?>
+<book xmlns="http://docbook.org/ns/docbook">
+<title>book title</title>
+<subtitle>book subtitle</subtitle>
+<info>
+<author>
+<firstname>Doc</firstname>
+<surname>Writer</surname>
+<email>doc@example.com</email>
+</author>
+</info>
+<section>
+<title>First Section</title>
+<para>content</para>
+</section>
+</book>
+    EOS
+
+    expected = <<-EOS.rstrip
+= book title: book subtitle
+Doc Writer <doc@example.com>
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+
+== First Section
+
+
+content
+EOS
+
+    output = Docbookrx.convert input
+
+    expect(output).to eq(expected)
+  end
+
+  it 'should convert procedure corectly' do
+    input = <<-EOS
+<procedure>
+  <title>How</title>
+  <step>
+    <para>step 1</para>
+  </step>
+  <step>
+    <para>step 2</para>
+  </step>
+  <step>
+    <para>step 3</para>
+  </step>
+  <step>
+    <para>step 4</para>
+    <substeps>
+      <step>
+        <para>step 4.1</para>
+      </step>
+      <step>
+        <para>step 4.2</para>
+      </step>
+      <step>
+        <para>step 4.3</para>
+      </step>
+    </substeps>
+  </step>
+  <step>
+    <para>step 5</para>
+  </step>
+  <step>
+    <para>step 6</para>
+    <substeps>
+      <step>
+        <para>step 6.1</para>
+      </step>
+      <step>
+        <para>step 6.2</para>
+      </step>
+    </substeps>
+  </step>
+  <step>
+    <para>step 7</para>
+  </step>
+  <step>
+    <para>step 8</para>
+  </step>
+  <step>
+    <para>step 9</para>
+  </step>
+</procedure>
+    EOS
+
+    expected = <<-EOS
+
+.Procedure: How
+. step 1
+. step 2
+. step 3
+. step 4
++
+.. step 4.1
+.. step 4.2
+.. step 4.3
+. step 5
+. step 6
++
+.. step 6.1
+.. step 6.2
+. step 7
+. step 8
+. step 9
+    EOS
+    output = Docbookrx.convert input
+
+    expect(output).to eq(expected)
+  end
+
+  it 'it should ' do
+    input = <<-EOS
+<procedure>
+  <title>How</title>
+  <step>
+    <para>step 1</para>
+  </step>
+  <step>
+    <para>step 2</para>
+  </step>
+  <step>
+    <para>step 3</para>
+  </step>
+  <step>
+    <para>step 4</para>
+    <substeps>
+      <step>
+        <para>step 4.1</para>
+      </step>
+      <step>
+        <para>step 4.2</para>
+      </step>
+      <step>
+        <para>step 4.3</para>
+      </step>
+    </substeps>
+  </step>
+  <step>
+    <para>step 5</para>
+  </step>
+  <step>
+    <para>step 6</para>
+    <substeps>
+      <step>
+        <para>step 6.1</para>
+      </step>
+      <step>
+        <para>step 6.2</para>
+      </step>
+    </substeps>
+  </step>
+  <step>
+    <para>step 7</para>
+  </step>
+  <step>
+    <para>step 8</para>
+  </step>
+  <step>
+    <para>step 9</para>
+  </step>
+</procedure>
+    EOS
+
+    expected = <<-EOS
+
+.Procedure: How
+. step 1
+. step 2
+. step 3
+. step 4
++
+.. step 4.1
+.. step 4.2
+.. step 4.3
+. step 5
+. step 6
++
+.. step 6.1
+.. step 6.2
+. step 7
+. step 8
+. step 9
+    EOS
+    output = Docbookrx.convert input
+
+    expect(output).to eq(expected)
+  end
+
+  it 'should not add blank/space/newline after xref in middle of para' do
+    input = <<-EOS
+<para>BEGIN <emphasis role="bold">Chapter 4: Contact Details</emphasis> (<xref linkend="C-Contact-Details"/>) END</para>
+    EOS
+
+    expected = <<-EOS.chomp
+
+BEGIN *Chapter 4: Contact Details* (<<C-Contact-Details>>) END
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: false
+
+    expect(output).to eq(expected)
+  end
+
+  it 'should handle spaces inside emphasis correctly' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<section>
+<title>test cases with role=bold</title>
+<para>BEGIN <emphasis role="bold">wemphasis wbold nospace</emphasis> END</para>
+<para>BEGIN <emphasis role="bold">wemphasis wbold espace </emphasis> END</para>
+<para>BEGIN <emphasis role="bold"> wemphasis wbold sspace</emphasis> END</para>
+<para>BEGIN <emphasis role="bold"> wemphasis wbold bspace </emphasis> END</para>
+</section>
+
+<section>
+<title>test cases with role=strong</title>
+<para>BEGIN <emphasis role="strong">wemphasis wstrong nospace</emphasis> END</para>
+<para>BEGIN <emphasis role="strong">wemphasis wstrong espace </emphasis> END</para>
+<para>BEGIN <emphasis role="strong"> wemphasis wstrong sspace</emphasis> END</para>
+<para>BEGIN <emphasis role="strong"> wemphasis wstrong bspace </emphasis> END</para>
+</section>
+
+<section>
+<title>test cases with role=marked</title>
+<para>BEGIN <emphasis role="marked">wemphasis wmarked nospace</emphasis> END</para>
+<para>BEGIN <emphasis role="marked">wemphasis wmarked espace </emphasis> END</para>
+<para>BEGIN <emphasis role="marked"> wemphasis wmarked sspace</emphasis> END</para>
+<para>BEGIN <emphasis role="marked"> wemphasis wmarked bspace </emphasis> END</para>
+</section>
+
+<section>
+<title>test cases with norole</title>
+<para>BEGIN <emphasis>wemphasis wnorole nospace</emphasis> END</para>
+<para>BEGIN <emphasis>wemphasis wnorole espace </emphasis> END</para>
+<para>BEGIN <emphasis> wemphasis wnorole sspace</emphasis> END</para>
+<para>BEGIN <emphasis> wemphasis wnorole bspace </emphasis> END</para>
+</section>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+== test cases with role=bold
+
+
+BEGIN *wemphasis wbold nospace* END
+
+BEGIN **wemphasis wbold espace ** END
+
+BEGIN ** wemphasis wbold sspace** END
+
+BEGIN ** wemphasis wbold bspace ** END
+
+== test cases with role=strong
+
+
+BEGIN *wemphasis wstrong nospace* END
+
+BEGIN **wemphasis wstrong espace ** END
+
+BEGIN ** wemphasis wstrong sspace** END
+
+BEGIN ** wemphasis wstrong bspace ** END
+
+== test cases with role=marked
+
+
+BEGIN #wemphasis wmarked nospace# END
+
+BEGIN ##wemphasis wmarked espace ## END
+
+BEGIN ## wemphasis wmarked sspace## END
+
+BEGIN ## wemphasis wmarked bspace ## END
+
+== test cases with norole
+
+
+BEGIN _wemphasis wnorole nospace_ END
+
+BEGIN __wemphasis wnorole espace __ END
+
+BEGIN __ wemphasis wnorole sspace__ END
+
+BEGIN __ wemphasis wnorole bspace __ END
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: false
+
+    expect(output).to eq(expected)
+  end
+
+
+  it 'should not not drop space/newline between adjacent elements' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<para> <emphasis role="bold">wemphasis</emphasis> drop leading space</para>
+
+<para>drop trailing space <emphasis role="bold">wemphasis</emphasis> </para>
+
+<para>keep space in in middle: first line
+before-wlinkend <xref linkend="wlinkend"/> <emphasis role="bold">wemphasis</emphasis> after wemphasis
+lastline</para>
+
+<para>keep newline in the middle: first line
+before-wlinkend <xref linkend="wlinkend"/>
+<emphasis role="bold">wemphasis</emphasis> after wemphasis
+lastline</para>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+*wemphasis* drop leading space
+
+drop trailing space *wemphasis*
+
+keep space in in middle: first line before-wlinkend <<wlinkend>> *wemphasis* after wemphasis lastline
+
+keep newline in the middle: first line before-wlinkend <<wlinkend>> *wemphasis* after wemphasis lastline
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: false
+
+    expect(output).to eq(expected)
   end
 
 end

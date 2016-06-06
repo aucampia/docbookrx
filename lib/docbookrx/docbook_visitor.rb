@@ -1,4 +1,5 @@
 module Docbookrx
+# vim: set ft=ruby sts=2 ts=2 sw=2 expandtab fo-=t:
 
 class DocbookVisitor
   # transfer node type constants from Nokogiri
@@ -245,6 +246,17 @@ class DocbookVisitor
     text
   end
 
+  def format_append_text_strip node, prefix="", suffix=""
+    text = format_text node
+    line = text.shift(1)[0]
+    line = strip_whitespace line
+    #line = line.strip
+    #STDERR.printf( "format_append_text_strip : %s\n", line );
+    append_text prefix + line + suffix
+    lines.concat(text) unless text.empty?
+    text
+  end
+
   def append_blank_line
     if @continuation
       @continuation = false
@@ -321,7 +333,8 @@ class DocbookVisitor
     else
       method_name = method.to_s
       case method_name
-      when "visit_itemizedlist", "visit_orderedlist"
+      when "visit_itemizedlist", "visit_orderedlist",
+         "visit_procedure", "visit_substeps", "visit_stepalternatives"
         @list_depth -= 1
       when "visit_table", "visit_informaltable"
         @in_table = false
@@ -334,7 +347,7 @@ class DocbookVisitor
       when "visit_para", "visit_text", "visit_simpara", 
            "visit_emphasis", "visit_link"
       else
-        unless ( FORMATTING_NAMES.include? node.name ) || ( ["uri", "ulink"].include? node.name )
+        unless ( FORMATTING_NAMES.include? node.name ) || ( ["uri", "ulink", "xref"].include? node.name )
           @last_added_was_special = true
         end
       end
@@ -403,6 +416,15 @@ class DocbookVisitor
   end
 
   def process_doc node
+    title = text_at_css node, '> title'
+    subtitle = text_at_css node, '> subtitle'
+    if ( title or subtitle )
+      titleline = %(= #{title})
+      titleline += %(: #{subtitle}) if subtitle
+      append_line titleline
+    end
+=begin
+=end
     @level += 1
     proceed node, :using_elements => true
     @level -= 1
@@ -411,7 +433,12 @@ class DocbookVisitor
 
   def process_info node
     title = text_at_css node, '> title'
-    append_line %(= #{title})
+    subtitle = text_at_css node, '> subtitle'
+    if ( title or subtitle )
+      titleline = %(= #{title})
+      titleline += %(: #{subtitle}) if subtitle
+      append_line titleline
+    end
     authors = []
     (node.css 'author').each do |author_node|
       # FIXME need to detect DocBook 4.5 vs 5.0 to handle names properly
@@ -656,7 +683,7 @@ class DocbookVisitor
 
   # FIXME this method needs cleanup, remove hardcoded logic!
   def visit_listitem node
-    marker = (node.parent.name == 'orderedlist' || node.parent.name == 'procedure' ? '.' * @list_depth : 
+    marker = (node.parent.name == 'orderedlist' || node.parent.name == 'procedure' || node.parent.name == 'substeps' ? '.' * @list_depth : 
       (node.parent.name == 'stepalternatives' ? 'a.' : '*' * @list_depth))
     append_text marker
 
@@ -1121,9 +1148,15 @@ class DocbookVisitor
   end
 
   def visit_text node
+    #STDERR.printf( "visit_text : node.path = '%s'\n", node.path );
+    #STDERR.printf( "visit_text : node.text = '%s'\n", node.text );
     in_para = PARA_TAG_NAMES.include?(node.parent.name) || node.parent.name == 'phrase'
-    # drop text if empty unless we're processing a paragraph
-    unless node.text.rstrip.empty?
+    is_first = ( node.previous ) ? false : true;
+    is_last = ( node.next ) ? false : true;
+    is_first_or_last = ( is_first or is_last );
+    # drop text if empty unless we're processing a paragraph, or were first or last thing in para
+    unless node.text.rstrip.empty? and not ( in_para and not is_first_or_last )
+      #STDERR.printf( "visit_text : node.text.rstrip.empty? == '%s'\n", node.text.rstrip.empty? );
       text = node.text
       if in_para
         leading_space_match = text.match LeadingSpaceRx
@@ -1227,12 +1260,20 @@ class DocbookVisitor
     linkend = node.attr 'linkend'
     id = @normalize_ids ? (normalize_id linkend) : linkend
     text = format_text node
+    #STDERR.printf( "%s\n", caller );
+    #STDERR.printf( "visit_xref : id = '%s'\n", id );
+    #STDERR.printf( "visit_xref : line = '%s'\n", node.line );
+    #STDERR.printf( "visit_xref : node.css_path = '%s'\n", node.path );
+    #STDERR.printf( "visit_xref : text = '%s'\n", text );
     label = text.shift(1)[0]
+    #STDERR.printf( "visit_xref : label = '%s'\n", label );
+    #STDERR.printf( "visit_xref : @lines[-1] = '%s'\n", @lines[-1] );
     if label.empty?
       append_text %(<<#{id}>>)
     else
       append_text %(<<#{id},#{lazy_quote label}>>)
     end
+    #STDERR.printf( "visit_xref : @lines[-1] = '%s'\n", @lines[-1] );
     lines.concat(text) unless text.empty?
     false
   end
@@ -1262,9 +1303,11 @@ class DocbookVisitor
 
   def visit_emphasis node
     quote_char = get_emphasis_quote_char node
-    times = (adjacent_character node) ? 2 : 1;
+    #STDERR.printf( "visit_emphasis : quote_char %s\n", quote_char );
+    times = ( (adjacent_character node) or (text_ends_or_starts_with_spaces node) ) ? 2 : 1;
 
-    format_append_text node, (quote_char * times), (quote_char * times)
+    #STDERR.printf( "visit_emphasis : ( quote_char * times ) %s\n", quote_char * times );
+    format_append_text_strip node, (quote_char * times), (quote_char * times)
     false
   end
 
@@ -1278,6 +1321,15 @@ class DocbookVisitor
     else
       '_'
     end
+  end
+
+  def text_ends_or_starts_with_spaces node
+    ## XXX I'm pretty sure there are better ways to do this ... but this seems to work
+    text = format_text node
+    text = text.shift(1)[0]
+    return true if text.end_with? "\s","\n","\t","\f"
+    return true if text.start_with? "\s","\n","\t","\f"
+    return false
   end
 
   def adjacent_character node
