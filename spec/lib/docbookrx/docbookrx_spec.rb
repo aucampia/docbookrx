@@ -765,7 +765,7 @@ break!
     EOS
     output = Docbookrx.convert input
 
-    expect(output).to include(expected)
+    expect(output).to eq(expected)
   end
 
   it 'should convert escape hashes in literal or formatted text' do
@@ -1450,6 +1450,37 @@ drop trailing space *wemphasis*
 keep space in in middle: first line before-wlinkend <<wlinkend>> *wemphasis* after wemphasis lastline
 
 keep newline in the middle: first line before-wlinkend <<wlinkend>> *wemphasis* after wemphasis lastline
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: false
+
+    expect(output).to eq(expected)
+  end
+
+  it 'it should escape special characters inside text nodes' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<para>BEGIN <emphasis role="bold">*-dependencies-rev.sh</emphasis> END</para>
+<para>BEGIN <emphasis role="bold">*-dependencies-rev*.sh</emphasis> END</para>
+<para>BEGIN <emphasis role="bold">setup-pcc-*-dependencies-rev*.sh</emphasis> END</para>
+<para>BEGIN <emphasis role="bold">setup-pcc-*-dependencies-rev*.sh</emphasis> END</para>
+<para>BEGIN <emphasis role="bold">setup-pcc]-*-dependencies-rev*.sh</emphasis> END</para>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+BEGIN *\\*-dependencies-rev.sh* END
+
+BEGIN *pass:verbatim[*-dependencies-rev*.sh]* END
+
+BEGIN *pass:verbatim[setup-pcc-*-dependencies-rev*.sh]* END
+
+BEGIN *pass:verbatim[setup-pcc-*-dependencies-rev*.sh]* END
+
+BEGIN *pass:verbatim[setup-pcc\\]-*-dependencies-rev*.sh]* END
     EOS
 
     output = Docbookrx.convert input, normalize_ids: false

@@ -1185,13 +1185,24 @@ class DocbookVisitor
         end
       end
       # escape |'s in table cell text
+      contains_specials = [ '_', '*', '+', '`', '#' ].any? { |special| text.include? special }
+      STDERR.printf( "visit_text : node.path = '%s'\n", node.path );
+      STDERR.printf( "visit_text : node.text = '%s'\n", node.text );
+      STDERR.printf( "visit_text : contains_specials = '%s'\n", contains_specials );
+      STDERR.printf( "visit_text : @nested_formatting.empty? = '%s'\n", @nested_formatting.empty? );
+
       if @in_table
         text = text.gsub(/\|/, '\|')
       end
       if ! @nested_formatting.empty?
-        if text.start_with? '_','*','+','`','#'
+        STDERR.printf( "visit_text : ! @nested_formatting = '%s'\n", @nested_formatting );
+        if ( text.start_with? '_','*','+','`','#' ) and not ( [ '_', '*', '+', '`', '#' ].any? { |special| text[1..-1].include? special } )
           text = '\\' + text
+        elsif ( [ '_', '*', '+', '`', '#' ].any? { |special| text.include? special } )
+          text = "pass:verbatim[" + text.gsub( /]/, '\]' ) + "]"
         end
+        #if [ '_', '*', '+', '`', '#' ].any? { |special| text.include? special }
+        #end
       end
       if ( @lines[-1].empty? ) && ( text.start_with? '.' )
         text = text.sub( /\A(\.+)/, "$$\\1$$" )
@@ -1201,7 +1212,6 @@ class DocbookVisitor
         text = "\n" + text.rstrip
         text = text + " " if readd_space
       end
-
       append_text text, true
     end
     false
@@ -1379,7 +1389,7 @@ class DocbookVisitor
     #else
     #  name
     #end
-    append_text %([#{role}]_#{node.text}_)
+    append_text %([#{role}]`#{node.text}`)
     false
   end
 
