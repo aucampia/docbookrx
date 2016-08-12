@@ -806,20 +806,26 @@ class DocbookVisitor
     # FIXME adds an extra blank line before first item
     #append_blank_line unless (previous = node.previous_element) && previous.name == 'title'
     append_blank_line
-    
+    vartext = ""
     text = format_text(node.at_css node, '> term')
     text.each do |text_line| 
       text_line.split(EOL).each_with_index do |line,i|
         line = line.gsub IndentationRx, ''
         if line.length > 0
           if i == 0 
-            append_line line
+            vartext += line
+            #append_line line
           else 
-            append_text ( " " + line )
+            #append_text ( " " + line )
+            vartext += " " + line
           end
         end
       end
     end
+    if ( xref_id = resolve_id( node, normalize: @normalize_ids ) )
+      append_line "[[#{xref_id},#{strip_whitespace( text_at_css( node, '> term' ) )}]]"
+    end
+    append_line vartext
     append_text "::"
 
     first_line = true
@@ -1058,6 +1064,9 @@ class DocbookVisitor
   def visit_table node
     append_blank_line
     append_block_title node
+    if ( xref_id = resolve_id( node, normalize: @normalize_ids ) )
+      append_line "[[#{xref_id}]]"
+    end
     process_table node
     false
   end
@@ -1312,6 +1321,9 @@ class DocbookVisitor
   end
 
   def visit_emphasis node
+    if node.previous and ADMONITION_NAMES.include? node.previous.name
+        append_line
+    end
     quote_char = get_emphasis_quote_char node
     #STDERR.printf( "visit_emphasis : quote_char %s\n", quote_char );
     times = ( (adjacent_character node) or (text_ends_or_starts_with_spaces node) ) ? 2 : 1;
@@ -1520,6 +1532,9 @@ class DocbookVisitor
       generated_alt = ::File.basename(src)[0...-(::File.extname(src).length)]
       alt = nil if alt && alt == generated_alt
       append_blank_line
+      if ( xref_id = resolve_id( node, normalize: @normalize_ids ) )
+        append_line "[[#{xref_id}]]"
+      end
       append_line %(image::#{src}[#{lazy_quote alt}])
       append_blank_line
     else

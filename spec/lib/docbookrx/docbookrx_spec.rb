@@ -1488,4 +1488,174 @@ BEGIN *pass:verbatim[setup-pcc\\]-*-dependencies-rev*.sh]* END
     expect(output).to eq(expected)
   end
 
+  it 'it should translate varlistentry ids' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<variablelist>
+
+<varlistentry xml:id="Related-PCC-Install-Guide">
+  <term>foo
+  too
+  far</term>
+  <listitem><para>bar</para></listitem>
+</variablelist>
+
+<varlistentry>
+  <term>morefoo</term>
+  <listitem>should point to original foo <xref linkend="Related-PCC-Install-Guide"/></listitem>
+</varlistentry>
+
+<varlistentry xml:id="some_other_xml id">
+  <term><emphasis role="bold">this should be sanitized
+first lest we have nasties in xrefs</emphasis></term>
+  <listitem><para>does not matter</para></listitem>
+</variablelist>
+
+</variablelist>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+[[_related_pcc_install_guide,foo too far]]
+foo too far::
+bar
+
+morefoo::
++<<_related_pcc_install_guide>>
+[[_some_other_xml id,this should be sanitized first lest we have nasties in xrefs]]
+*this should be sanitized first lest we have nasties in xrefs*::
+does not matter
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: true
+
+    expect(output).to eq(expected)
+  end
+
+  it 'it should handle emphasis immediately following admontion' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<para>
+<tip>
+  <para>Before performing this procedure, notify users of the <emphasis role="italic">Universal
+      Product Interface</emphasis> Web application that it will be off-line. </para>
+  <para>These users are typically:<itemizedlist>
+      <listitem>
+        <para>Administrators and business managers, who create Promotions for use by
+          subscribers</para>
+      </listitem>
+      <listitem>
+        <para>Customer care personnel who manage Promotions on behalf of mobile subscribers.</para>
+      </listitem>
+      <listitem>
+        <para>Business analysts who obtain reports that show how mobile subscribers use
+          Promotions</para>
+      </listitem>
+    </itemizedlist>
+  </para>
+</tip><emphasis role="bold">Before You Begin</emphasis>:some more texties
+</para>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+
+
+[TIP]
+====
+Before performing this procedure, notify users of the _Universal Product Interface_ Web application that it will be off-line. 
+
+These users are typically:
+
+* Administrators and business managers, who create Promotions for use by subscribers
+* Customer care personnel who manage Promotions on behalf of mobile subscribers.
+* Business analysts who obtain reports that show how mobile subscribers use Promotions
+
+====
+**Before You Begin**:some more texties 
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: true
+
+    expect(output).to eq(expected)
+  end
+
+  it 'should handle figure ids' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+  <para>In the <emphasis role="bold">Host Name (or IP
+      address)</emphasis> field, type the IP address of the
+    server or its host name, as shown in <xref
+      linkend="F-PuTTY_SSH_system"/>. <figure
+      xml:id="F-PuTTY_SSH_system">
+      <info>
+        <title>SSH Access to Gateway Using the PuTTY
+        Client</title>
+      </info>
+      <mediaobject role="">
+        <imageobject>
+        <imagedata fileref="./images/Putty-login.png"
+        depth="" scalefit="1" contentwidth="10.5cm"/>
+        </imageobject>
+      </mediaobject>
+    </figure></para>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+In the *Host Name (or IP address)* field, type the IP address of the server or its host name, as shown in <<_f_putty_ssh_system>>. 
+
+.SSH Access to Gateway Using the PuTTYClient
+[[_f_putty_ssh_system]]
+image::./images/Putty-login.png[]
+
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: true
+
+    expect(output).to eq(expected)
+  end
+
+  it 'should handle table ids' do
+    input = <<-EOS
+<article xmlns='http://docbook.org/ns/docbook'>
+
+<table frame="all" xml:id="T-Licence-description">
+  <title>PCC Licence Description</title>
+  <tgroup cols="2">
+    <colspec colname="c1" colnum="1" colwidth="6cm"/>
+    <colspec colname="c2" colnum="2" colwidth="9cm"/>
+    <thead>
+      <entry>Entry</entry>
+      <entry>Description</entry>
+    </thead>
+  </tgroup>
+</table>
+
+</article>
+    EOS
+
+    expected = <<-EOS.chomp
+
+.PCC Licence Description
+[[_t_licence_description]]
+[cols="1,1", frame="all", options="header"]
+|===
+|===
+    EOS
+
+    output = Docbookrx.convert input, normalize_ids: true
+
+    expect(output).to eq(expected)
+  end
+
 end
